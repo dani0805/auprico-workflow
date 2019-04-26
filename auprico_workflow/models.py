@@ -486,7 +486,7 @@ class TransitionLog(models.Model):
     workflow = models.ForeignKey(Workflow, on_delete=PROTECT, verbose_name=ugettext_lazy("Workflow"),
         editable=False)
     user_id = models.IntegerField(blank=True, null=True, verbose_name=ugettext_lazy("User Id"))
-    object_id = models.IntegerField(verbose_name=ugettext_lazy("Object Id"))
+    current_object_state = models.ForeignKey(CurrentObjectState, verbose_name=ugettext_lazy("Object State"))
     transition = models.ForeignKey(Transition, on_delete=PROTECT, verbose_name=ugettext_lazy("Transition"))
     completed_ts = models.DateTimeField(auto_now=True, verbose_name=ugettext_lazy("Time of Completion"))
     success = models.BooleanField(verbose_name=ugettext_lazy("Success"))
@@ -612,8 +612,12 @@ class SingleWorkflowObject(models.Model):
         abstract = True
 
     @property
+    def state(self):
+        return self.current_state.state
+
+    @property
     def transition_log(self):
-        return TransitionLog.objects.filter(object_id = self.current_state.object_id, workflow=self.current_state.workflow)
+        return TransitionLog.objects.filter(current_object_state=self.current_state)
 
     def available_transitions(self, user: User, automatic=False):
         return self.current_state.state.available_transitions(user, self.current_state.object_id, automatic=automatic)
@@ -623,6 +627,33 @@ class SingleWorkflowObject(models.Model):
             user,
             self.current_state.object_id,
             object_state_id=self.current_state,
+            async=async,
+            automatic=automatic
+        )
+
+
+class MultiWorkflowObject(models.Model):
+    current_states = models.ManyToManyField(CurrentObjectState, on_delete=PROTECT, verbose_name=ugettext_lazy("Object States"), related_name="%(app_label)s_%(class)s")
+
+    class Meta:
+        abstract = True
+
+    def state(self, workflow: Workflow):
+        return self.current_states.get(workflow=workflow).state
+
+    def transition_log(self, workflow: Workflow):
+        return TransitionLog.objects.filter(current_object_state=self.self.current_states.get(workflow=workflow))
+
+    def available_transitions(self, user: User, workflow: Workflow, automatic=False):
+        obj_state = self.current_states.get(workflow=workflow)
+        return obj_state.state.available_transitions(user, obj_state.object_id, automatic=automatic)
+
+    def execute_transition(self, transition:Transition, user: User, async=False, automatic=False):
+        obj_state = self.current_states.get(workflow=transition.workflow)
+        return transition.execute(
+            user,
+            obj_state.object_id,
+            object_state_id=obj_state,
             async=async,
             automatic=automatic
         )
