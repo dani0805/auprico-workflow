@@ -1,0 +1,4 @@
+Django==2.2
+auprico-core>=0.1
+graphene-django>=2.2
+
