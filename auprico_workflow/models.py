@@ -647,7 +647,7 @@ class SingleWorkflowObject(models.Model):
 
 
 class MultiWorkflowObject(models.Model):
-    current_states = models.ManyToManyField(CurrentObjectState, on_delete=PROTECT,
+    current_states = models.ManyToManyField(CurrentObjectState,
         verbose_name=ugettext_lazy("Object States"), related_name="%(app_label)s_%(class)s")
 
     class Meta:
