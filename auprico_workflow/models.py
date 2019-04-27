@@ -603,7 +603,11 @@ def _atomic_execution(object_id, object_state_id, transition, user):
         params = {p.name: p.value for p in c.parameters.all()}
         c.function(workflow=transition.final_state.workflow, user=user, object_id=object_id,
             object_state=object_state, **params)
-    TransitionLog.objects.create(object_id=object_id, user_id=user.id if user else None, transition=transition,
+    TransitionLog.objects.create(
+        workflow=object_state.workflow,
+        current_object_state=object_state,
+        user_id=user.id if user else None,
+        transition=transition,
         success=True)
     return object_state
 
