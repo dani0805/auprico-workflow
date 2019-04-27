@@ -1,15 +1,15 @@
-import threading
 import json
+import threading
 from datetime import timedelta, datetime
-from typing import Tuple, TypeVar
+from typing import TypeVar
 
 from auprico_auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import SET_NULL
+from django.db.models.deletion import PROTECT
 from django.utils.timezone import now as django_now
 from django.utils.translation import ugettext_lazy
-from django.db.models.deletion import PROTECT
 
 # import a definition from a module at runtime
 from auprico_workflow.utils import import_from, import_from_path
@@ -18,7 +18,6 @@ T = TypeVar('T', bound=models.Model)
 
 
 def clone(old_object: T, **defaults) -> (T, T):
-
     id = old_object.id
     new_object = old_object
     new_object.id = None
@@ -127,7 +126,7 @@ class Workflow(models.Model):
                 return False
 
     def natural_key(self):
-        return (self.name,)
+        return self.name,
 
     def add_object(self, object_id, async=True):
         process = CurrentObjectState.objects.create(object_id=object_id, state=self.initial_state)
@@ -199,6 +198,7 @@ class StateVariableDefManager(models.Manager):
     def get_by_natural_key(self, name, workflow):
         return self.get(name=name, workflow__name=workflow)
 
+
 class StateVariableDef(models.Model):
     objects = StateVariableDefManager()
     workflow = models.ForeignKey(Workflow, on_delete=PROTECT, verbose_name=ugettext_lazy("Workflow"))
@@ -214,6 +214,7 @@ class StateVariableDef(models.Model):
 
     def natural_key(self):
         return self.name, self.state.name, self.workflow.name
+
 
 class TransitionManager(models.Manager):
 
@@ -287,7 +288,8 @@ class Transition(models.Model):
         if self.initial_state:
             initial_state = State.objects.get(workflow=workflow,
                 id=state_map[self.initial_state.id])
-        new_transition, old_transition = clone(self, workflow=workflow, initial_state=initial_state, final_state=final_state)
+        new_transition, old_transition = clone(self, workflow=workflow, initial_state=initial_state,
+            final_state=final_state)
         for condition in old_transition.condition_set.all():
             new_condition, old_condition = condition.clone(workflow=workflow, transition=new_transition)
         for callback in old_transition.callback_set.all():
@@ -340,7 +342,8 @@ class Condition(models.Model):
             call = func.function
             params = {p.name: p.value for p in func.parameters.all()}
             wf = self.workflow
-            result = call(workflow=wf, user=user, object_id=object_id, object_state=object_state, transition=transition, **params)
+            result = call(workflow=wf, user=user, object_id=object_id, object_state=object_state, transition=transition,
+                **params)
             if result is None:
                 result = False
             # #print("{}.{} ({}, {}, {}, **{}) = {}".format(func.function_module,func.function_name, wf, user,
@@ -352,17 +355,22 @@ class Condition(models.Model):
                 object_state=object_state, transition=transition)
             # Recursive
         elif self.condition_type == "and":
-            #print([c.check_condition(user=user, object_id=object_id, object_state=object_state, transition=transition) for c in
-                #self.child_conditions.all()])
-            return all([c.check_condition(user=user, object_id=object_id, object_state=object_state, transition=transition) for c in
-                self.child_conditions.all()])
+            # print([c.check_condition(user=user, object_id=object_id, object_state=object_state,
+            # transition=transition) for c in
+            # self.child_conditions.all()])
+            return all(
+                [c.check_condition(user=user, object_id=object_id, object_state=object_state, transition=transition) for
+                    c in
+                    self.child_conditions.all()])
             # Recursive
         elif self.condition_type == "or":
-            return any([c.check_condition(user=user, object_id=object_id, object_state=object_state, transition=transition) for c in
-                self.child_conditions.all()])
+            return any(
+                [c.check_condition(user=user, object_id=object_id, object_state=object_state, transition=transition) for
+                    c in
+                    self.child_conditions.all()])
 
     def clone(self, *, workflow: Workflow, **defaults) -> ('Condition', 'Condition'):
-        #old_condition: Condition
+        # old_condition: Condition
         new_condition, old_condition = clone(self, workflow=workflow, **defaults)
         for condition in old_condition.child_conditions.all():
             new_child, old_child = condition.clone(workflow=workflow, parent_condition=new_condition)
@@ -390,7 +398,7 @@ class Function(models.Model):
         return import_from(self.function_module, self.function_name)
 
     def clone(self, *, workflow: Workflow, **defaults) -> ('Function', 'Function'):
-        #old_function: Function
+        # old_function: Function
         new_function, old_function = clone(self, workflow=workflow, **defaults)
         for param in old_function.parameters.all():
             new_param, old_param = param.clone(workflow=workflow, function=new_function)
@@ -438,7 +446,7 @@ class Callback(models.Model):
         ordering = ["order"]
 
     def clone(self, *, workflow: Workflow, **defaults) -> ('Callback', 'Callback'):
-        #old_function: Function
+        # old_function: Function
         new_callback, old_callback = clone(self, workflow=workflow, **defaults)
         for param in old_callback.parameters.all():
             new_param, old_param = param.clone(workflow=workflow, callback=new_callback)
@@ -486,7 +494,8 @@ class TransitionLog(models.Model):
     workflow = models.ForeignKey(Workflow, on_delete=PROTECT, verbose_name=ugettext_lazy("Workflow"),
         editable=False)
     user_id = models.IntegerField(blank=True, null=True, verbose_name=ugettext_lazy("User Id"))
-    current_object_state = models.ForeignKey(CurrentObjectState, verbose_name=ugettext_lazy("Object State"))
+    current_object_state = models.ForeignKey(CurrentObjectState, on_delete=PROTECT,
+        verbose_name=ugettext_lazy("Object State"))
     transition = models.ForeignKey(Transition, on_delete=PROTECT, verbose_name=ugettext_lazy("Transition"))
     completed_ts = models.DateTimeField(auto_now=True, verbose_name=ugettext_lazy("Time of Completion"))
     success = models.BooleanField(verbose_name=ugettext_lazy("Success"))
@@ -502,6 +511,7 @@ class TransitionLog(models.Model):
     def save(self, **qwargs):
         self.workflow = self.transition.workflow
         super(TransitionLog, self).save(**qwargs)
+
 
 def _is_transition_available(transition, user, object_id, object_state_id=None, automatic=False,
         last_transition=None):
@@ -521,23 +531,24 @@ def _is_transition_available(transition, user, object_id, object_state_id=None, 
         if last_transition is None:
             last_transition = object_state.updated_ts
         if automatic != transition.automatic:
-            #print("not executing because of automatic setting")
+            # print("not executing because of automatic setting")
             return False
         if automatic \
                 and transition.automatic_delay is not None \
                 and last_transition is not None \
                 and django_now() - last_transition < timedelta(days=transition.automatic_delay):
-            #print("not executing because of delay")
+            # print("not executing because of delay")
             return False
         root_condition = transition.condition_set.filter(parent_condition__isnull=True)
         condition_checks = True
         if root_condition.exists():
             condition_checks = root_condition.first().check_condition(user=user, object_id=object_id, object_state
             =object_state, transition=transition)
-        #print("condition_checks: {}".format(condition_checks))
+        # print("condition_checks: {}".format(condition_checks))
         return condition_checks
     else:
         return False
+
 
 def _execute_transition(*, transition, user, object_id, object_state_id, automatic=False, last_transition=None,
         recursion_count=0):
@@ -559,6 +570,7 @@ def _execute_transition(*, transition, user, object_id, object_state_id, automat
             last_transition=django_now())
         return object_state
 
+
 def _execute_atomatic_transitions(state, object_id, object_state_id, async=False, last_transition=None):
     if not state.active:
         return None
@@ -567,6 +579,7 @@ def _execute_atomatic_transitions(state, object_id, object_state_id, async=False
         if t.is_available(user=None, object_id=object_id, object_state_id=object_state_id, automatic=True):
             return _execute_transition(transition=t, user=None, object_id=object_id,
                 object_state_id=object_state_id, automatic=True, last_transition=last_transition)
+
 
 @transaction.atomic
 def _atomic_execution(object_id, object_state_id, transition, user):
@@ -606,7 +619,8 @@ class StateVariable(models.Model):
 
 
 class SingleWorkflowObject(models.Model):
-    current_state = models.ForeignKey(CurrentObjectState, on_delete=PROTECT, verbose_name=ugettext_lazy("Object State"), related_name="%(app_label)s_%(class)s")
+    current_state = models.ForeignKey(CurrentObjectState, on_delete=PROTECT, verbose_name=ugettext_lazy("Object State"),
+        related_name="%(app_label)s_%(class)s")
 
     class Meta:
         abstract = True
@@ -622,7 +636,7 @@ class SingleWorkflowObject(models.Model):
     def available_transitions(self, user: User, automatic=False):
         return self.current_state.state.available_transitions(user, self.current_state.object_id, automatic=automatic)
 
-    def execute_transition(self, transition:Transition, user: User, async=False, automatic=False):
+    def execute_transition(self, transition: Transition, user: User, async=False, automatic=False):
         return transition.execute(
             user,
             self.current_state.object_id,
@@ -633,7 +647,8 @@ class SingleWorkflowObject(models.Model):
 
 
 class MultiWorkflowObject(models.Model):
-    current_states = models.ManyToManyField(CurrentObjectState, on_delete=PROTECT, verbose_name=ugettext_lazy("Object States"), related_name="%(app_label)s_%(class)s")
+    current_states = models.ManyToManyField(CurrentObjectState, on_delete=PROTECT,
+        verbose_name=ugettext_lazy("Object States"), related_name="%(app_label)s_%(class)s")
 
     class Meta:
         abstract = True
@@ -648,7 +663,7 @@ class MultiWorkflowObject(models.Model):
         obj_state = self.current_states.get(workflow=workflow)
         return obj_state.state.available_transitions(user, obj_state.object_id, automatic=automatic)
 
-    def execute_transition(self, transition:Transition, user: User, async=False, automatic=False):
+    def execute_transition(self, transition: Transition, user: User, async=False, automatic=False):
         obj_state = self.current_states.get(workflow=transition.workflow)
         return transition.execute(
             user,

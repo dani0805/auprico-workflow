@@ -20,6 +20,7 @@ def import_from_path(full_path):
 _first_cap_re = re.compile('(.)([A-Z][a-z]+)')
 _all_cap_re = re.compile('([a-z0-9])([A-Z])')
 
+
 def camelcase_to_underscore(word):
     """
     Needed to replicate the transformation between capitalize convention (graph-ql) and underscore convention (python)
@@ -32,11 +33,11 @@ def camelcase_to_underscore(word):
 
 def parse_global_ids(return_node_types=None, include_branches=None):
     def decorator(func, **kwargs):
-        def decorated_function(cls, root, info , **data):
+        def decorated_function(cls, root, info, **data):
             node_types = dict()
             current_dict = data
             parse_branch(current_dict, data, node_types, list())
-            return func(cls, root, info , node_types=node_types, **data)
+            return func(cls, root, info, node_types=node_types, **data)
 
         def parse_branch(current_dict, data, node_types, route):
             if isinstance(current_dict, dict) or isinstance(current_dict, OrderedDict):
@@ -51,7 +52,7 @@ def parse_global_ids(return_node_types=None, include_branches=None):
                         parse_node(data, key, node_types, route)
                     if include_branches is not None and key in include_branches:
                         this_dict = from_string(current_dict, key)
-                        parse_branch(this_dict, data, node_types, route + [key,])
+                        parse_branch(this_dict, data, node_types, route + [key, ])
             elif isinstance(current_dict, list) or isinstance(current_dict, tuple):
                 for i, this_dict in enumerate(current_dict):
                     this_dict = from_string(current_dict, i)
@@ -85,4 +86,5 @@ def parse_global_ids(return_node_types=None, include_branches=None):
                 node_types.update({key: node_type})
 
         return decorated_function
+
     return decorator
