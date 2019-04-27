@@ -622,7 +622,7 @@ class StateVariable(models.Model):
     value = models.CharField(max_length=4000, verbose_name=ugettext_lazy("Value"))
 
 
-class SingleWorkflowObject(models.Model):
+class SingleWorkflowModel(models.Model):
     current_state = models.ForeignKey(CurrentObjectState, on_delete=PROTECT, verbose_name=ugettext_lazy("Object State"),
         related_name="%(app_label)s_%(class)s")
 
@@ -650,7 +650,7 @@ class SingleWorkflowObject(models.Model):
         )
 
 
-class MultiWorkflowObject(models.Model):
+class MultiWorkflowModel(models.Model):
     current_states = models.ManyToManyField(CurrentObjectState,
         verbose_name=ugettext_lazy("Object States"), related_name="%(app_label)s_%(class)s")
 

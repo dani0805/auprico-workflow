@@ -6,6 +6,7 @@ from django.db.models.manager import Manager
 
 from auprico_workflow.utils import import_from, import_from_path
 
+
 def object_attribute_value(*, workflow, object_id, user, object_state, **kwargs):
     params = parse_parameters(workflow=workflow, object_id=object_id, user=user, object_state=object_state, **kwargs)
     if "attribute_name" in params:
@@ -27,6 +28,7 @@ def user_attribute_value(*, workflow, object_id, user, object_state, **kwargs):
             attribute_value = params.pop('attribute_value')
             return attribute == attribute_value
     raise ValueError("missing parameter attribute_name or attribute_value")
+
 
 def object_attribute_filter_exist(*, workflow, object_id, user, object_state, **kwargs):
     params = parse_parameters(workflow=workflow, object_id=object_id, user=user, object_state=object_state, **kwargs)
