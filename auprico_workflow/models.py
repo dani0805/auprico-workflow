@@ -128,9 +128,9 @@ class Workflow(models.Model):
     def natural_key(self):
         return self.name,
 
-    def add_object(self, object_id, async=True):
+    def add_object(self, object_id, asynchonous=True):
         process = CurrentObjectState.objects.create(object_id=object_id, state=self.initial_state)
-        _execute_atomatic_transitions(self.initial_state, object_id, process.id, async=async)
+        _execute_atomatic_transitions(self.initial_state, object_id, process.id, asynchonous=asynchonous)
         return process
 
     def object_class(self):
@@ -272,8 +272,8 @@ class Transition(models.Model):
         return _is_transition_available(self, user, object_id, object_state_id=object_state_id, automatic=automatic,
             last_transition=last_transition)
 
-    def execute(self, user, object_id, object_state_id=None, async=False, automatic=False):
-        if async:
+    def execute(self, user, object_id, object_state_id=None, asynchonous=False, automatic=False):
+        if asynchonous:
             thr = threading.Thread(target=_execute_transition, args=(self, user, object_id, object_state_id),
                 kwargs={"automatic": automatic})
             thr.start()
@@ -571,7 +571,7 @@ def _execute_transition(*, transition, user, object_id, object_state_id, automat
         return object_state
 
 
-def _execute_atomatic_transitions(state, object_id, object_state_id, async=False, last_transition=None):
+def _execute_atomatic_transitions(state, object_id, object_state_id, asynchonous=False, last_transition=None):
     if not state.active:
         return None
     automatic_transitions = state.outgoing_transitions.filter(automatic=True)
@@ -640,12 +640,12 @@ class SingleWorkflowModel(models.Model):
     def available_transitions(self, user: User, automatic=False):
         return self.current_state.state.available_transitions(user, self.current_state.object_id, automatic=automatic)
 
-    def execute_transition(self, transition: Transition, user: User, async=False, automatic=False):
+    def execute_transition(self, transition: Transition, user: User, asynchonous=False, automatic=False):
         return transition.execute(
             user,
             self.current_state.object_id,
             object_state_id=self.current_state,
-            async=async,
+            asynchonous=asynchonous,
             automatic=automatic
         )
 
@@ -667,12 +667,12 @@ class MultiWorkflowModel(models.Model):
         obj_state = self.current_states.get(workflow=workflow)
         return obj_state.state.available_transitions(user, obj_state.object_id, automatic=automatic)
 
-    def execute_transition(self, transition: Transition, user: User, async=False, automatic=False):
+    def execute_transition(self, transition: Transition, user: User, asynchonous=False, automatic=False):
         obj_state = self.current_states.get(workflow=transition.workflow)
         return transition.execute(
             user,
             obj_state.object_id,
             object_state_id=obj_state,
-            async=async,
+            asynchonous=asynchonous,
             automatic=automatic
         )
