@@ -40,6 +40,7 @@ class Workflow(models.Model):
     object_type = models.CharField(max_length=200, verbose_name=ugettext_lazy("Object_Type"))
     initial_prefetch = models.CharField(max_length=4000, null=True, blank=True,
         verbose_name=ugettext_lazy("Object_Type"))
+    parent_workflow = models.ForeignKey('Workflow', on_delete=PROTECT, null=True)
 
     @property
     def initial_prefetch_dict(self):
@@ -476,6 +477,8 @@ class CurrentObjectState(models.Model):
     object_id = models.CharField(max_length=200, verbose_name=ugettext_lazy("Object Id"))
     state = models.ForeignKey(State, on_delete=PROTECT, verbose_name=ugettext_lazy("State"))
     updated_ts = models.DateTimeField(auto_now=True, verbose_name=ugettext_lazy("Last Updated"))
+    parent_object_state = models.ForeignKey('CurrentObjectState', on_delete=PROTECT, null=True,
+                                            related_name="child_object_states")
 
     class Meta:
         indexes = [
@@ -488,6 +491,20 @@ class CurrentObjectState(models.Model):
     def save(self, **qwargs):
         self.workflow = self.state.workflow
         super(CurrentObjectState, self).save(**qwargs)
+
+    def associate_subworkflow(self, *, obj_id):
+        obj = CurrentObjectState.objects.filter(id=obj_id)
+        if obj.workflow.parent_workflow == self.workflow:
+            obj.parent_object_state = self
+            obj.save()
+            return True
+        return False
+
+    def all_subobjects_closed(self):
+        for child_obj in self.child_object_states.all():
+            if not child_obj.state.is_final_state:
+                return False
+        return True
 
 
 class TransitionLog(models.Model):
@@ -601,6 +618,7 @@ def _atomic_execution(object_id, object_state_id, transition, user):
     for c in transition.callback_set.filter(execute_async=False):
         # #print("executing {}.{}".format(c.function_module, c.function_name))
         params = {p.name: p.value for p in c.parameters.all()}
+        print("test")
         c.function(workflow=transition.final_state.workflow, user=user, object_id=object_id,
             object_state=object_state, **params)
     TransitionLog.objects.create(

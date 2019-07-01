@@ -98,3 +98,11 @@ def execute_automatic_transitions(workflow_name=None, object_state_id=None, obje
         raise ValueError("object_id cannot be passed without workflow_name")
     for o in objects:
         _execute_atomatic_transitions(o.state, o.object_id, object_state_id, asynchonous=False)
+
+
+def all_subobjects_closed(*, workflow, object_id, user, object_state, **kwargs):
+
+    if object_state:
+        return object_state.all_subobjects_closed()
+
+    raise ValueError("missing parameter attribute_name or attribute_value")
